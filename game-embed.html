@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لعبة: حارس النجوم</title>
+  <style>
+    :root {
+      --bg1: #0a0f1f;
+      --bg2: #131b38;
+      --accent: #8b5cf6;
+      --accent2: #22d3ee;
+      --text: #f8fafc;
+      --danger: #fb7185;
+      --good: #4ade80;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 20% 20%, #1d2b58, #070b16 70%);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      padding: 16px;
+    }
+
+    .game-shell {
+      width: min(92vw, 860px);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(19, 27, 56, 0.95), rgba(10, 15, 31, 0.95));
+      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 14px;
+    }
+
+    .pill {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-weight: 600;
+    }
+
+    .board {
+      position: relative;
+      aspect-ratio: 16 / 10;
+      width: 100%;
+      background: linear-gradient(180deg, var(--bg2), var(--bg1));
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 24px;
+      background: linear-gradient(180deg, rgba(6, 10, 20, 0.45), rgba(6, 10, 20, 0.75));
+      backdrop-filter: blur(4px);
+      transition: opacity .25s;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .card {
+      max-width: 540px;
+      background: rgba(17, 24, 39, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    h1, h2 { margin: 8px 0; }
+
+    p {
+      margin: 8px 0;
+      opacity: .92;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    button {
+      margin-top: 12px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(34, 211, 238, 0.35);
+    }
+
+    .help {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 16px 16px;
+      font-size: 13px;
+      color: #dbeafe;
+      opacity: 0.9;
+    }
+
+    .highlight { color: var(--good); font-weight: 700; }
+    .danger { color: var(--danger); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="game-shell">
+    <div class="topbar">
+      <div class="title">🚀 حارس النجوم</div>
+      <div class="stats">
+        <div class="pill">النقاط: <span id="score">0</span></div>
+        <div class="pill">الرقم القياسي: <span id="best">0</span></div>
+        <div class="pill">المستوى: <span id="level">1</span></div>
+        <div class="pill">الطاقة: <span id="hp">3</span></div>
+      </div>
+    </div>
+
+    <div class="board" id="board">
+      <canvas id="game" width="960" height="600"></canvas>
+
+      <div class="overlay" id="startOverlay">
+        <div class="card">
+          <h1>🚀 حارس النجوم</h1>
+          <p>
+            حرّك المركبة يمينًا ويسارًا لجمع الكرات المضيئة <span class="highlight">(+نقاط)</span>
+            وتجنّب النيازك <span class="danger">(-طاقة)</span>.
+          </p>
+          <p>التحكم: ⬅️➡️ أو <b>A / D</b> أو السحب بالماوس/اللمس.</p>
+          <button id="startBtn">ابدأ اللعب</button>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="gameOverOverlay">
+        <div class="card">
+          <h2>انتهت اللعبة 💥</h2>
+          <p>نتيجتك: <b id="finalScore">0</b></p>
+          <p>أفضل نتيجة: <b id="finalBest">0</b></p>
+          <button id="restartBtn">إعادة المحاولة</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="help">
+      <div>كل 150 نقطة يرتفع المستوى وتزيد السرعة.</div>
+      <div>مناسب للتضمين داخل iframe أو WebView.</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const board = document.getElementById('board');
+
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const levelEl = document.getElementById('level');
+    const hpEl = document.getElementById('hp');
+
+    const startOverlay = document.getElementById('startOverlay');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const finalBestEl = document.getElementById('finalBest');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+
+    let raf;
+    const state = {
+      running: false,
+      score: 0,
+      level: 1,
+      hp: 3,
+      best: Number(localStorage.getItem('star_guardian_best') || 0),
+      spawnTimer: 0,
+      stars: [],
+      meteors: [],
+      particles: [],
+      player: { x: canvas.width / 2, y: canvas.height - 70, w: 80, h: 34, speed: 540 },
+      keys: { left: false, right: false },
+      pointerX: null,
+      lastTime: 0
+    };
+
+    bestEl.textContent = state.best;
+
+    function reset() {
+      state.running = true;
+      state.score = 0;
+      state.level = 1;
+      state.hp = 3;
+      state.spawnTimer = 0;
+      state.stars = [];
+      state.meteors = [];
+      state.particles = [];
+      state.player.x = canvas.width / 2;
+      state.lastTime = performance.now();
+      updateUI();
+    }
+
+    function updateUI() {
+      scoreEl.textContent = Math.floor(state.score);
+      levelEl.textContent = state.level;
+      hpEl.textContent = state.hp;
+      bestEl.textContent = state.best;
+    }
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+
+    function spawnEntity() {
+      const isMeteor = Math.random() < Math.min(0.35 + state.level * 0.03, 0.62);
+      const speed = rand(120 + state.level * 22, 220 + state.level * 28);
+      const x = rand(24, canvas.width - 24);
+
+      if (isMeteor) {
+        state.meteors.push({ x, y: -35, r: rand(14, 26), speed, rot: rand(0, Math.PI), spin: rand(-2, 2) });
+      } else {
+        state.stars.push({ x, y: -25, r: rand(12, 20), speed, pulse: rand(0, Math.PI * 2) });
+      }
+    }
+
+    function addParticles(x, y, color, count = 14) {
+      for (let i = 0; i < count; i++) {
+        state.particles.push({
+          x,
+          y,
+          vx: rand(-180, 180),
+          vy: rand(-180, 180),
+          life: rand(0.35, 0.7),
+          maxLife: 0.7,
+          size: rand(2, 5),
+          color
+        });
+      }
+    }
+
+    function collidesCircleRect(cx, cy, r, rx, ry, rw, rh) {
+      const nearestX = clamp(cx, rx, rx + rw);
+      const nearestY = clamp(cy, ry, ry + rh);
+      const dx = cx - nearestX;
+      const dy = cy - nearestY;
+      return dx * dx + dy * dy <= r * r;
+    }
+
+    function endGame() {
+      state.running = false;
+      cancelAnimationFrame(raf);
+      state.best = Math.max(state.best, Math.floor(state.score));
+      localStorage.setItem('star_guardian_best', String(state.best));
+      finalScoreEl.textContent = Math.floor(state.score);
+      finalBestEl.textContent = state.best;
+      updateUI();
+      gameOverOverlay.classList.remove('hidden');
+    }
+
+    function update(dt) {
+      const p = state.player;
+
+      if (state.keys.left) p.x -= p.speed * dt;
+      if (state.keys.right) p.x += p.speed * dt;
+      if (state.pointerX != null) {
+        p.x += (state.pointerX - p.x) * Math.min(1, dt * 9);
+      }
+      p.x = clamp(p.x, p.w / 2 + 6, canvas.width - p.w / 2 - 6);
+
+      const spawnEvery = Math.max(0.25, 0.85 - state.level * 0.06);
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        spawnEntity();
+        state.spawnTimer = spawnEvery;
+      }
+
+      const rx = p.x - p.w / 2;
+      const ry = p.y - p.h / 2;
+
+      state.stars = state.stars.filter((s) => {
+        s.y += s.speed * dt;
+        s.pulse += dt * 7;
+        if (collidesCircleRect(s.x, s.y, s.r, rx, ry, p.w, p.h)) {
+          state.score += 25;
+          addParticles(s.x, s.y, '#4ade80', 18);
+          return false;
+        }
+        return s.y < canvas.height + 30;
+      });
+
+      state.meteors = state.meteors.filter((m) => {
+        m.y += m.speed * dt;
+        m.rot += m.spin * dt;
+        if (collidesCircleRect(m.x, m.y, m.r, rx, ry, p.w, p.h)) {
+          state.hp -= 1;
+          addParticles(m.x, m.y, '#fb7185', 24);
+          if (state.hp <= 0) endGame();
+          return false;
+        }
+        return m.y < canvas.height + 40;
+      });
+
+      state.particles = state.particles.filter((pt) => {
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.vx *= 0.97;
+        pt.vy *= 0.97;
+        pt.life -= dt;
+        return pt.life > 0;
+      });
+
+      state.score += dt * (8 + state.level * 1.2);
+      state.level = Math.floor(state.score / 150) + 1;
+      state.best = Math.max(state.best, Math.floor(state.score));
+      updateUI();
+    }
+
+    function drawBackground(time) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0b1227';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 55; i++) {
+        const x = (i * 197 + (time * 0.03) % canvas.width) % canvas.width;
+        const y = (i * 109) % canvas.height;
+        const tw = (Math.sin(i + time * 0.002) + 1.4) * 1.2;
+        ctx.fillStyle = `rgba(226,232,240,${0.18 + (tw / 6)})`;
+        ctx.fillRect(x, y, tw, tw);
+      }
+    }
+
+    function drawPlayer() {
+      const p = state.player;
+      const x = p.x;
+      const y = p.y;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      const grad = ctx.createLinearGradient(-38, 0, 38, 0);
+      grad.addColorStop(0, '#22d3ee');
+      grad.addColorStop(1, '#8b5cf6');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(-36, 14);
+      ctx.lineTo(0, -18);
+      ctx.lineTo(36, 14);
+      ctx.lineTo(0, 8);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = '#22d3ee';
+      ctx.fillStyle = '#67e8f9';
+      ctx.fillRect(-10, 12, 8, 10);
+      ctx.fillRect(2, 12, 8, 10);
+      ctx.restore();
+    }
+
+    function draw() {
+      const time = performance.now();
+      drawBackground(time);
+
+      state.stars.forEach((s) => {
+        const pulse = 1 + Math.sin(s.pulse) * 0.15;
+        const r = s.r * pulse;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const rr = i % 2 === 0 ? r : r * 0.45;
+          const a = (Math.PI / 5) * i - Math.PI / 2;
+          const xx = Math.cos(a) * rr;
+          const yy = Math.sin(a) * rr;
+          i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+        }
+        ctx.closePath();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#fde047';
+        ctx.fill();
+        ctx.restore();
+      });
+
+      state.meteors.forEach((m) => {
+        ctx.save();
+        ctx.translate(m.x, m.y);
+        ctx.rotate(m.rot);
+        ctx.fillStyle = '#9ca3af';
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const rr = m.r * rand(0.72, 1.02);
+          const a = (Math.PI * 2 / 8) * i;
+          const xx = Math.cos(a) * rr;
+          const yy = Math.sin(a) * rr;
+          i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      state.particles.forEach((pt) => {
+        const alpha = pt.life / pt.maxLife;
+        ctx.fillStyle = pt.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+        if (!ctx.fillStyle.includes('rgba')) {
+          ctx.fillStyle = pt.color;
+          ctx.globalAlpha = alpha;
+        }
+        ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
+        ctx.globalAlpha = 1;
+      });
+
+      drawPlayer();
+    }
+
+    function frame(now) {
+      const dt = Math.min(0.033, (now - state.lastTime) / 1000);
+      state.lastTime = now;
+
+      if (state.running) update(dt);
+      draw();
+      if (state.running) raf = requestAnimationFrame(frame);
+    }
+
+    function setPointerFromClientX(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = canvas.width / rect.width;
+      state.pointerX = (clientX - rect.left) * ratio;
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') state.keys.left = true;
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') state.keys.right = true;
+      if (!state.running && (e.key === 'Enter' || e.key === ' ')) {
+        if (!startOverlay.classList.contains('hidden')) startGame();
+        else restartGame();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') state.keys.left = false;
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') state.keys.right = false;
+    });
+
+    board.addEventListener('mousemove', (e) => setPointerFromClientX(e.clientX));
+    board.addEventListener('mouseleave', () => { state.pointerX = null; });
+
+    board.addEventListener('touchstart', (e) => {
+      if (e.touches[0]) setPointerFromClientX(e.touches[0].clientX);
+    }, { passive: true });
+    board.addEventListener('touchmove', (e) => {
+      if (e.touches[0]) setPointerFromClientX(e.touches[0].clientX);
+    }, { passive: true });
+    board.addEventListener('touchend', () => { state.pointerX = null; }, { passive: true });
+
+    function startGame() {
+      startOverlay.classList.add('hidden');
+      gameOverOverlay.classList.add('hidden');
+      reset();
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(frame);
+    }
+
+    function restartGame() {
+      gameOverOverlay.classList.add('hidden');
+      reset();
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(frame);
+    }
+
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', restartGame);
+
+    draw();
+  </script>
+</body>
+</html>
